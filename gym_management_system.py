@@ -1,7 +1,7 @@
 """
 Fitness & Gym Membership Management System
 CMPE 351 - Database Systems Project
-Author: Nehir
+Nehir Gürsoy 122200051
 """
 
 import streamlit as st
@@ -10,17 +10,13 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 import os
 
-# ========================================
 # DATABASE SETUP & CONNECTION
-# ========================================
 
 def get_connection():
-    """Create and return database connection"""
     conn = sqlite3.connect('gym_management.db', check_same_thread=False)
     return conn
 
 def create_tables():
-    """Create all database tables"""
     conn = get_connection()
     cursor = conn.cursor()
     
@@ -31,7 +27,7 @@ def create_tables():
         First_Name TEXT NOT NULL,
         Last_Name TEXT NOT NULL,
         Email TEXT UNIQUE NOT NULL,
-        Phone TEXT NOT NULL,
+        Phone TEXT UNIQUE NOT NULL,
         Date_of_Birth DATE NOT NULL,
         Join_Date DATE NOT NULL,
         Status TEXT CHECK(Status IN ('Active', 'Inactive')) DEFAULT 'Active'
@@ -72,7 +68,7 @@ def create_tables():
         Last_Name TEXT NOT NULL,
         Specialization TEXT NOT NULL,
         Email TEXT UNIQUE NOT NULL,
-        Phone TEXT NOT NULL,
+        Phone TEXT UNIQUE NOT NULL,
         Hire_Date DATE NOT NULL
     )
     ''')
@@ -81,7 +77,7 @@ def create_tables():
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS Classes (
         Class_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        Class_Name TEXT NOT NULL,
+        Class_Name TEXT UNIQUE NOT NULL,
         Class_Type TEXT NOT NULL,
         Trainer_ID INTEGER NOT NULL,
         Schedule_Day TEXT CHECK(Schedule_Day IN ('Monday', 'Tuesday', 'Wednesday', 
@@ -112,15 +108,13 @@ def create_tables():
     conn.close()
 
 def insert_sample_data():
-    """Insert sample data into all tables"""
     conn = get_connection()
     cursor = conn.cursor()
     
-    # Check if data already exists
     cursor.execute("SELECT COUNT(*) FROM Members")
     if cursor.fetchone()[0] > 0:
         conn.close()
-        return  # Data already inserted
+        return  
     
     # Sample Members (5+)
     members = [
@@ -193,12 +187,33 @@ def insert_sample_data():
     conn.commit()
     conn.close()
 
-# ========================================
+# VALIDATION FUNCTIONS
+
+def check_member_has_membership(member_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT COUNT(*) FROM Member_Memberships 
+        WHERE Member_ID = ?
+    ''', (member_id,))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count > 0
+
+def check_member_has_active_membership(member_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT COUNT(*) FROM Member_Memberships 
+        WHERE Member_ID = ? AND Is_Active = 1
+    ''', (member_id,))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count > 0
+
 # CRUD OPERATIONS
-# ========================================
 
 def insert_member(first_name, last_name, email, phone, dob, join_date, status):
-    """Insert a new member"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -214,7 +229,6 @@ def insert_member(first_name, last_name, email, phone, dob, join_date, status):
         return False, f"Error: {str(e)}"
 
 def insert_membership_plan(plan_name, duration, price, benefits):
-    """Insert a new membership plan"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -230,7 +244,6 @@ def insert_membership_plan(plan_name, duration, price, benefits):
         return False, f"Error: {str(e)}"
 
 def insert_trainer(first_name, last_name, specialization, email, phone, hire_date):
-    """Insert a new trainer"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -246,7 +259,6 @@ def insert_trainer(first_name, last_name, specialization, email, phone, hire_dat
         return False, f"Error: {str(e)}"
 
 def insert_class(class_name, class_type, trainer_id, schedule_day, schedule_time, duration, capacity):
-    """Insert a new class"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -262,7 +274,6 @@ def insert_class(class_name, class_type, trainer_id, schedule_day, schedule_time
         return False, f"Error: {str(e)}"
 
 def insert_booking(member_id, class_id, booking_date, status):
-    """Insert a new class booking"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -278,7 +289,6 @@ def insert_booking(member_id, class_id, booking_date, status):
         return False, f"Error: Member already has a booking for this class on this date"
 
 def delete_record(table_name, id_column, record_id):
-    """Delete a record from specified table"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -294,72 +304,7 @@ def delete_record(table_name, id_column, record_id):
         conn.close()
         return False, f"Error: {str(e)}"
 
-def update_member(member_id, first_name, last_name, email, phone, status):
-    """Update member information"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            UPDATE Members 
-            SET First_Name = ?, Last_Name = ?, Email = ?, Phone = ?, Status = ?
-            WHERE Member_ID = ?
-        ''', (first_name, last_name, email, phone, status, member_id))
-        conn.commit()
-        rows_affected = cursor.rowcount
-        conn.close()
-        if rows_affected > 0:
-            return True, "Member updated successfully!"
-        else:
-            return False, "Member not found!"
-    except Exception as e:
-        conn.close()
-        return False, f"Error: {str(e)}"
-
-def update_class(class_id, class_name, schedule_day, schedule_time, max_capacity):
-    """Update class information"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            UPDATE Classes 
-            SET Class_Name = ?, Schedule_Day = ?, Schedule_Time = ?, Max_Capacity = ?
-            WHERE Class_ID = ?
-        ''', (class_name, schedule_day, schedule_time, max_capacity, class_id))
-        conn.commit()
-        rows_affected = cursor.rowcount
-        conn.close()
-        if rows_affected > 0:
-            return True, "Class updated successfully!"
-        else:
-            return False, "Class not found!"
-    except Exception as e:
-        conn.close()
-        return False, f"Error: {str(e)}"
-
-def update_booking_status(booking_id, new_status):
-    """Update booking attendance status"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            UPDATE Class_Bookings 
-            SET Attendance_Status = ?
-            WHERE Booking_ID = ?
-        ''', (new_status, booking_id))
-        conn.commit()
-        rows_affected = cursor.rowcount
-        conn.close()
-        if rows_affected > 0:
-            return True, "Booking status updated successfully!"
-        else:
-            return False, "Booking not found!"
-    except Exception as e:
-        conn.close()
-        return False, f"Error: {str(e)}"
-
-# ========================================
 # JOIN QUERIES
-# ========================================
 
 def get_member_memberships_join():
     """JOIN: Get members with their active membership plans"""
@@ -458,9 +403,7 @@ def get_trainer_workload_join():
     conn.close()
     return df
 
-# ========================================
 # UTILITY FUNCTIONS
-# ========================================
 
 def get_all_records(table_name):
     """Get all records from a table"""
@@ -470,28 +413,21 @@ def get_all_records(table_name):
     return df
 
 def get_members():
-    """Get all members"""
     return get_all_records('Members')
 
 def get_trainers():
-    """Get all trainers"""
     return get_all_records('Trainers')
 
 def get_classes():
-    """Get all classes"""
     return get_all_records('Classes')
 
 def get_bookings():
-    """Get all bookings"""
     return get_all_records('Class_Bookings')
 
 def get_membership_plans():
-    """Get all membership plans"""
     return get_all_records('Membership_Plans')
 
-# ========================================
 # STREAMLIT UI
-# ========================================
 
 def main():
     st.set_page_config(
@@ -500,26 +436,22 @@ def main():
         layout="wide"
     )
     
-    # Initialize database
     create_tables()
     insert_sample_data()
-    
-    # Header
+
     st.title("💪 Fitness & Gym Membership Management System")
+    st.markdown("**CMPE 351 - Database Systems Project | Nehir Gürsoy 122200051**")
     st.markdown("---")
     
-    # Sidebar navigation
-    st.sidebar.title("Navigation")
+    st.sidebar.title("MENU")
     menu = st.sidebar.radio(
         "Select Operation:",
-        ["🏠 Home", "➕ Insert Data", "❌ Delete Data", "✏️ Update Data", "🔍 JOIN Queries", "📊 View Tables"]
+        ["🏠 Home", "➕ Insert", "❌ Delete", "✏️ Update", "🔍 JOIN", "📊 View Tables"]
     )
     
-    # ========================================
     # HOME PAGE
-    # ========================================
     if menu == "🏠 Home":
-        st.header("Welcome to Gym Management System")
+        st.header("Welcome to Gym Management System!")
         
         col1, col2, col3 = st.columns(3)
         
@@ -544,18 +476,22 @@ def main():
         st.write("✅ Class Booking System")
         st.write("✅ Comprehensive Reporting")
     
-    # ========================================
     # INSERT DATA
-    # ========================================
-    elif menu == "➕ Insert Data":
+    elif menu == "➕ Insert":
         st.header("Insert New Data")
         
         tab1, tab2, tab3, tab4, tab5 = st.tabs(["👤 Member", "📋 Membership Plan", "🏋️ Trainer", "📅 Class", "🎫 Booking"])
         
-        # Insert Member
         with tab1:
             st.subheader("Add New Member")
+            st.info("⚠️ Every member must have a membership plan. Please select a plan below.")
+            
+            plans_df = get_membership_plans()
+            plan_options = {f"{row['Plan_Name']} - ${row['Price']} ({row['Duration_Months']} months)": row['Plan_ID'] 
+                          for _, row in plans_df.iterrows()}
+            
             with st.form("insert_member_form"):
+                st.markdown("**Member Information**")
                 col1, col2 = st.columns(2)
                 with col1:
                     first_name = st.text_input("First Name*")
@@ -568,18 +504,47 @@ def main():
                 
                 status = st.selectbox("Status", ["Active", "Inactive"])
                 
-                submitted = st.form_submit_button("Add Member")
+                st.markdown("---")
+                st.markdown("**Initial Membership Plan** (Required)")
+                selected_plan = st.selectbox("Select Membership Plan*", list(plan_options.keys()))
+                
+                col3, col4 = st.columns(2)
+                with col3:
+                    start_date = st.date_input("Membership Start Date*", value=date.today())
+                with col4:
+                    payment_status = st.selectbox("Payment Status*", ["Paid", "Pending"])
+                
+                submitted = st.form_submit_button("Add Member with Membership")
                 if submitted:
-                    if first_name and last_name and email and phone:
+                    if first_name and last_name and email and phone and selected_plan:
                         success, message = insert_member(first_name, last_name, email, phone, dob, join_date, status)
                         if success:
-                            st.success(message)
+                            conn = get_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT Member_ID FROM Members WHERE Email = ?", (email,))
+                            member_id = cursor.fetchone()[0]
+                            
+                            plan_id = plan_options[selected_plan]
+                            cursor.execute("SELECT Duration_Months FROM Membership_Plans WHERE Plan_ID = ?", (plan_id,))
+                            duration = cursor.fetchone()[0]
+                            
+                            end_date = start_date + timedelta(days=duration * 30)
+                            
+                            cursor.execute('''
+                                INSERT INTO Member_Memberships (Member_ID, Plan_ID, Start_Date, End_Date, Payment_Status, Is_Active)
+                                VALUES (?, ?, ?, ?, ?, 1)
+                            ''', (member_id, plan_id, start_date, end_date, payment_status))
+                            
+                            conn.commit()
+                            conn.close()
+                            
+                            st.success(f"✅ Member added successfully with {selected_plan}!")
+                            st.balloons()
                         else:
                             st.error(message)
                     else:
                         st.error("Please fill in all required fields!")
         
-        # Insert Membership Plan
         with tab2:
             st.subheader("Add New Membership Plan")
             with st.form("insert_plan_form"):
@@ -602,7 +567,6 @@ def main():
                     else:
                         st.error("Please fill in all required fields!")
         
-        # Insert Trainer
         with tab3:
             st.subheader("Add New Trainer")
             with st.form("insert_trainer_form"):
@@ -628,7 +592,6 @@ def main():
                     else:
                         st.error("Please fill in all required fields!")
         
-        # Insert Class
         with tab4:
             st.subheader("Add New Class")
             trainers_df = get_trainers()
@@ -662,7 +625,6 @@ def main():
                     else:
                         st.error("Please fill in all required fields!")
         
-        # Insert Booking
         with tab5:
             st.subheader("Add New Booking")
             members_df = get_members()
@@ -695,214 +657,470 @@ def main():
                     else:
                         st.error("Please fill in all required fields!")
     
-    # ========================================
     # DELETE DATA
-    # ========================================
-    elif menu == "❌ Delete Data":
+    elif menu == "❌ Delete":
         st.header("Delete Data")
+        st.info("💡 You can delete entire records OR specific fields (set to NULL/default)")
         
-        tab1, tab2, tab3, tab4, tab5 = st.tabs(["👤 Member", "🏋️ Trainer", "📅 Class", "🎫 Booking", "📋 Membership Plan"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["👤 Member", "🏋️ Trainer", "📅 Class", "🎫 Booking", "📋 Plan"])
         
-        # Delete Member
         with tab1:
-            st.subheader("Delete Member")
+            st.subheader("Delete Member Data")
             members_df = get_members()
+            
             if not members_df.empty:
                 st.dataframe(members_df, use_container_width=True)
-                member_id = st.number_input("Enter Member ID to delete", min_value=1, step=1)
-                if st.button("Delete Member", type="primary"):
-                    success, message = delete_record("Members", "Member_ID", member_id)
-                    if success:
-                        st.success(message)
-                        st.rerun()
-                    else:
-                        st.error(message)
+                
+                delete_type = st.radio("What to delete?", ["Entire Member Record", "Specific Field Data"], horizontal=True)
+                
+                if delete_type == "Entire Member Record":
+                    st.warning("⚠️ This will delete the member and all their memberships and bookings (CASCADE)")
+                    member_id = st.number_input("Member ID to delete", min_value=1, step=1)
+                    if st.button("🗑️ Delete Entire Member", type="primary"):
+                        success, msg = delete_record("Members", "Member_ID", member_id)
+                        if success:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                else:
+                    st.info("Clear specific field (phone can be cleared, but email cannot as it's required)")
+                    member_id = st.number_input("Member ID", min_value=1, step=1)
+                    field = st.selectbox("Field to clear", ["Phone"])
+                    st.caption("Note: Phone will be set to empty. Other fields cannot be cleared as they're required.")
+                    
+                    if st.button("Clear Field"):
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            # For phone, we need a default value since it's UNIQUE NOT NULL
+                            cursor.execute(f"UPDATE Members SET {field} = ? WHERE Member_ID = ?", 
+                                         (f'CLEARED-{member_id}', member_id))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"✅ {field} cleared!")
+                                st.rerun()
+                            else:
+                                st.error("Member not found!")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+                        finally:
+                            conn.close()
             else:
-                st.info("No members in the database.")
+                st.info("No members in database.")
         
-        # Delete Trainer
         with tab2:
-            st.subheader("Delete Trainer")
+            st.subheader("Delete Trainer Data")
             trainers_df = get_trainers()
+            
             if not trainers_df.empty:
                 st.dataframe(trainers_df, use_container_width=True)
-                trainer_id = st.number_input("Enter Trainer ID to delete", min_value=1, step=1)
-                if st.button("Delete Trainer", type="primary"):
-                    success, message = delete_record("Trainers", "Trainer_ID", trainer_id)
-                    if success:
-                        st.success(message)
-                        st.rerun()
-                    else:
-                        st.error(message)
+                
+                delete_type = st.radio("What to delete?", ["Entire Trainer Record", "Specific Field Data"], horizontal=True, key="del_trainer")
+                
+                if delete_type == "Entire Trainer Record":
+                    st.warning("⚠️ Cannot delete if trainer has members or classes assigned (RESTRICT)")
+                    trainer_id = st.number_input("Trainer ID to delete", min_value=1, step=1)
+                    if st.button("🗑️ Delete Entire Trainer", type="primary"):
+                        success, msg = delete_record("Trainers", "Trainer_ID", trainer_id)
+                        if success:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                else:
+                    st.info("Clear specific field data")
+                    trainer_id = st.number_input("Trainer ID", min_value=1, step=1, key="tr_id_field")
+                    field = st.selectbox("Field to clear", ["Phone"])
+                    st.caption("Note: Only non-critical fields can be cleared")
+                    
+                    if st.button("Clear Field", key="clear_trainer"):
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute(f"UPDATE Trainers SET {field} = ? WHERE Trainer_ID = ?", 
+                                         (f'CLEARED-{trainer_id}', trainer_id))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"✅ {field} cleared!")
+                                st.rerun()
+                            else:
+                                st.error("Trainer not found!")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+                        finally:
+                            conn.close()
             else:
-                st.info("No trainers in the database.")
+                st.info("No trainers in database.")
         
-        # Delete Class
         with tab3:
-            st.subheader("Delete Class")
+            st.subheader("Delete Class Data")
             classes_df = get_classes()
+            
             if not classes_df.empty:
                 st.dataframe(classes_df, use_container_width=True)
-                class_id = st.number_input("Enter Class ID to delete", min_value=1, step=1)
-                if st.button("Delete Class", type="primary"):
-                    success, message = delete_record("Classes", "Class_ID", class_id)
-                    if success:
-                        st.success(message)
-                        st.rerun()
-                    else:
-                        st.error(message)
+                
+                delete_type = st.radio("What to delete?", ["Entire Class Record", "Specific Field Data"], horizontal=True, key="del_class")
+                
+                if delete_type == "Entire Class Record":
+                    st.warning("⚠️ This will also delete all bookings for this class (CASCADE)")
+                    class_id = st.number_input("Class ID to delete", min_value=1, step=1)
+                    if st.button("🗑️ Delete Entire Class", type="primary"):
+                        success, msg = delete_record("Classes", "Class_ID", class_id)
+                        if success:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                else:
+                    st.info("Clear specific field data (capacity can be reduced)")
+                    class_id = st.number_input("Class ID", min_value=1, step=1, key="cl_id_field")
+                    field = st.selectbox("Field to modify", ["Max_Capacity"])
+                    
+                    if field == "Max_Capacity":
+                        new_value = st.number_input("New Capacity (0 to close class)", min_value=0, value=0)
+                        if st.button("Update Capacity", key="update_class_cap"):
+                            conn = get_connection()
+                            cursor = conn.cursor()
+                            try:
+                                cursor.execute(f"UPDATE Classes SET {field} = ? WHERE Class_ID = ?", 
+                                             (new_value, class_id))
+                                conn.commit()
+                                if cursor.rowcount > 0:
+                                    st.success(f"✅ Capacity updated to {new_value}!")
+                                    st.rerun()
+                                else:
+                                    st.error("Class not found!")
+                            except Exception as e:
+                                st.error(f"Error: {str(e)}")
+                            finally:
+                                conn.close()
             else:
-                st.info("No classes in the database.")
+                st.info("No classes in database.")
         
-        # Delete Booking
         with tab4:
-            st.subheader("Delete Booking")
+            st.subheader("Delete Booking Data")
             bookings_df = get_bookings()
+            
             if not bookings_df.empty:
                 st.dataframe(bookings_df, use_container_width=True)
-                booking_id = st.number_input("Enter Booking ID to delete", min_value=1, step=1)
-                if st.button("Delete Booking", type="primary"):
-                    success, message = delete_record("Class_Bookings", "Booking_ID", booking_id)
-                    if success:
-                        st.success(message)
-                        st.rerun()
-                    else:
-                        st.error(message)
+                
+                delete_type = st.radio("What to delete?", ["Entire Booking Record", "Cancel Booking"], horizontal=True, key="del_booking")
+                
+                if delete_type == "Entire Booking Record":
+                    st.warning("⚠️ Permanently remove booking from system")
+                    booking_id = st.number_input("Booking ID to delete", min_value=1, step=1)
+                    if st.button("🗑️ Delete Entire Booking", type="primary"):
+                        success, msg = delete_record("Class_Bookings", "Booking_ID", booking_id)
+                        if success:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                else:
+                    st.info("Change booking status to 'Cancelled' instead of deleting")
+                    booking_id = st.number_input("Booking ID", min_value=1, step=1, key="bk_id_field")
+                    
+                    if st.button("Cancel Booking", key="cancel_booking"):
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute("UPDATE Class_Bookings SET Attendance_Status = 'Cancelled' WHERE Booking_ID = ?", 
+                                         (booking_id,))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success("✅ Booking cancelled!")
+                                st.rerun()
+                            else:
+                                st.error("Booking not found!")
+                        finally:
+                            conn.close()
             else:
-                st.info("No bookings in the database.")
+                st.info("No bookings in database.")
         
-        # Delete Membership Plan
         with tab5:
-            st.subheader("Delete Membership Plan")
+            st.subheader("Delete Membership Plan Data")
             plans_df = get_membership_plans()
+            
             if not plans_df.empty:
                 st.dataframe(plans_df, use_container_width=True)
-                plan_id = st.number_input("Enter Plan ID to delete", min_value=1, step=1)
-                if st.button("Delete Plan", type="primary"):
-                    success, message = delete_record("Membership_Plans", "Plan_ID", plan_id)
-                    if success:
-                        st.success(message)
-                        st.rerun()
+                
+                delete_type = st.radio("What to delete?", ["Entire Plan Record", "Specific Field Data"], horizontal=True, key="del_plan")
+                
+                if delete_type == "Entire Plan Record":
+                    st.warning("⚠️ Cannot delete if plan is assigned to members (RESTRICT)")
+                    plan_id = st.number_input("Plan ID to delete", min_value=1, step=1)
+                    if st.button("🗑️ Delete Entire Plan", type="primary"):
+                        success, msg = delete_record("Membership_Plans", "Plan_ID", plan_id)
+                        if success:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                else:
+                    st.info("Modify plan details")
+                    plan_id = st.number_input("Plan ID", min_value=1, step=1, key="pl_id_field")
+                    field = st.selectbox("Field to modify", ["Price", "Benefits_Description"])
+                    
+                    if field == "Price":
+                        new_value = st.number_input("New Price ($)", min_value=0.0, value=0.0, step=10.0)
                     else:
-                        st.error(message)
+                        new_value = st.text_area("New Benefits", value="Plan discontinued")
+                    
+                    if st.button("Update Field", key="update_plan_field"):
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute(f"UPDATE Membership_Plans SET {field} = ? WHERE Plan_ID = ?", 
+                                         (new_value, plan_id))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"✅ {field} updated!")
+                                st.rerun()
+                            else:
+                                st.error("Plan not found!")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+                        finally:
+                            conn.close()
             else:
-                st.info("No membership plans in the database.")
+                st.info("No plans in database.")
     
-    # ========================================
-    # UPDATE DATA
-    # ========================================
-    elif menu == "✏️ Update Data":
+    # UPDATE DATA (IMPROVED)
+    elif menu == "✏️ Update":
         st.header("Update Data")
+        st.info("💡 Step 1: Select by ID/Name → Step 2: Choose Field → Step 3: Enter New Value")
         
-        tab1, tab2, tab3 = st.tabs(["👤 Update Member", "📅 Update Class", "🎫 Update Booking Status"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["👤 Member", "🏋️ Trainer", "📋 Plan", "📅 Class", "🎫 Booking"])
         
         # Update Member
         with tab1:
-            st.subheader("Update Member Information")
+            st.subheader("Update Member")
             members_df = get_members()
             
             if not members_df.empty:
                 st.dataframe(members_df, use_container_width=True)
                 
                 with st.form("update_member_form"):
-                    member_id = st.number_input("Member ID to Update*", min_value=1, step=1)
+                    st.markdown("**Step 1: Select Member**")
+                    member_id = st.number_input("Member ID*", min_value=1, step=1)
                     
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        first_name = st.text_input("New First Name*")
-                        last_name = st.text_input("New Last Name*")
-                        email = st.text_input("New Email*")
-                    with col2:
-                        phone = st.text_input("New Phone*")
-                        status = st.selectbox("New Status", ["Active", "Inactive"])
+                    st.markdown("**Step 2: Choose Field to Update**")
+                    field = st.selectbox("Field*", ['First_Name', 'Last_Name', 'Email', 'Phone', 'Status'])
                     
-                    submitted = st.form_submit_button("Update Member")
-                    if submitted:
-                        if first_name and last_name and email and phone:
-                            success, message = update_member(member_id, first_name, last_name, email, phone, status)
-                            if success:
-                                st.success(message)
+                    st.markdown("**Step 3: Enter New Value**")
+                    if field == 'Status':
+                        new_value = st.selectbox("New Value*", ['Active', 'Inactive'])
+                    else:
+                        new_value = st.text_input("New Value*")
+                    
+                    submitted = st.form_submit_button("✅ Update Member", type="primary")
+                    if submitted and new_value:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute(f'UPDATE Members SET {field} = ? WHERE Member_ID = ?', (new_value, member_id))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"✅ Member {field} updated!")
                                 st.rerun()
                             else:
-                                st.error(message)
-                        else:
-                            st.error("Please fill in all fields!")
+                                st.error("Member not found!")
+                        except sqlite3.IntegrityError:
+                            st.error("Error: This value already exists (must be unique)!")
+                        finally:
+                            conn.close()
             else:
-                st.info("No members in the database.")
+                st.info("No members in database.")
+        
+        # Update Trainer
+        with tab2:
+            st.subheader("Update Trainer")
+            trainers_df = get_trainers()
+            
+            if not trainers_df.empty:
+                st.dataframe(trainers_df, use_container_width=True)
+                
+                with st.form("update_trainer_form"):
+                    st.markdown("**Step 1: Select Trainer**")
+                    trainer_id = st.number_input("Trainer ID*", min_value=1, step=1)
+                    
+                    st.markdown("**Step 2: Choose Field to Update**")
+                    field = st.selectbox("Field*", ['First_Name', 'Last_Name', 'Specialization', 'Email', 'Phone'])
+                    
+                    st.markdown("**Step 3: Enter New Value**")
+                    if field == 'Specialization':
+                        new_value = st.selectbox("New Value*", ["Yoga", "CrossFit", "Pilates", "Spinning", "Zumba", "Personal Training", "Boxing", "Swimming"])
+                    else:
+                        new_value = st.text_input("New Value*")
+                    
+                    submitted = st.form_submit_button("✅ Update Trainer", type="primary")
+                    if submitted and new_value:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute(f'UPDATE Trainers SET {field} = ? WHERE Trainer_ID = ?', (new_value, trainer_id))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"✅ Trainer {field} updated!")
+                                st.rerun()
+                            else:
+                                st.error("Trainer not found!")
+                        except sqlite3.IntegrityError:
+                            st.error("Error: This value already exists (must be unique)!")
+                        finally:
+                            conn.close()
+            else:
+                st.info("No trainers in database.")
+        
+        # Update Plan
+        with tab3:
+            st.subheader("Update Membership Plan")
+            plans_df = get_membership_plans()
+            
+            if not plans_df.empty:
+                st.dataframe(plans_df, use_container_width=True)
+                
+                with st.form("update_plan_form"):
+                    st.markdown("**Step 1: Select Plan**")
+                    selection_method = st.radio("Select by:", ["Plan ID", "Plan Name"], horizontal=True, key="plan_select")
+                    
+                    if selection_method == "Plan ID":
+                        plan_id = st.number_input("Plan ID*", min_value=1, step=1)
+                    else:
+                        name_list = plans_df['Plan_Name'].tolist()
+                        selected_name = st.selectbox("Select Plan Name*", name_list)
+                        plan_id = plans_df[plans_df['Plan_Name'] == selected_name]['Plan_ID'].values[0]
+                    
+                    st.markdown("**Step 2: Choose Field to Update**")
+                    field = st.selectbox("Field*", ['Plan_Name', 'Duration_Months', 'Price', 'Benefits_Description'])
+                    
+                    st.markdown("**Step 3: Enter New Value**")
+                    if field == 'Duration_Months':
+                        new_value = st.number_input("New Value (months)*", min_value=1, max_value=24, value=1)
+                    elif field == 'Price':
+                        new_value = st.number_input("New Value ($)*", min_value=0.0, value=50.0, step=10.0)
+                    else:
+                        new_value = st.text_input("New Value*")
+                    
+                    submitted = st.form_submit_button("✅ Update Plan", type="primary")
+                    if submitted and new_value:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute(f'UPDATE Membership_Plans SET {field} = ? WHERE Plan_ID = ?', (new_value, plan_id))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"✅ Plan {field} updated!")
+                                st.rerun()
+                            else:
+                                st.error("Plan not found!")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+                        finally:
+                            conn.close()
+            else:
+                st.info("No plans in database.")
         
         # Update Class
-        with tab2:
-            st.subheader("Update Class Information")
+        with tab4:
+            st.subheader("Update Class")
             classes_df = get_classes()
             
             if not classes_df.empty:
                 st.dataframe(classes_df, use_container_width=True)
                 
                 with st.form("update_class_form"):
-                    class_id = st.number_input("Class ID to Update*", min_value=1, step=1)
+                    st.markdown("**Step 1: Select Class**")
+                    selection_method = st.radio("Select by:", ["Class ID", "Class Name"], horizontal=True, key="class_select")
                     
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        class_name = st.text_input("New Class Name*")
-                        schedule_day = st.selectbox("New Schedule Day*", 
-                                                   ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
-                    with col2:
-                        schedule_time = st.time_input("New Schedule Time*")
-                        max_capacity = st.number_input("New Max Capacity*", min_value=1, max_value=100, value=20)
+                    if selection_method == "Class ID":
+                        class_id = st.number_input("Class ID*", min_value=1, step=1)
+                    else:
+                        name_list = classes_df['Class_Name'].tolist()
+                        selected_name = st.selectbox("Select Class Name*", name_list)
+                        class_id = classes_df[classes_df['Class_Name'] == selected_name]['Class_ID'].values[0]
                     
-                    submitted = st.form_submit_button("Update Class")
-                    if submitted:
-                        if class_name:
-                            time_str = schedule_time.strftime("%H:%M")
-                            success, message = update_class(class_id, class_name, schedule_day, time_str, max_capacity)
-                            if success:
-                                st.success(message)
+                    st.markdown("**Step 2: Choose Field to Update**")
+                    field = st.selectbox("Field*", ['Class_Name', 'Schedule_Day', 'Schedule_Time', 'Duration_Minutes', 'Max_Capacity'])
+                    
+                    st.markdown("**Step 3: Enter New Value**")
+                    if field == 'Schedule_Day':
+                        new_value = st.selectbox("New Value*", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
+                    elif field == 'Schedule_Time':
+                        time_val = st.time_input("New Value*")
+                        new_value = time_val.strftime("%H:%M")
+                    elif field in ['Duration_Minutes', 'Max_Capacity']:
+                        new_value = st.number_input("New Value*", min_value=1, value=30)
+                    else:
+                        new_value = st.text_input("New Value*")
+                    
+                    submitted = st.form_submit_button("✅ Update Class", type="primary")
+                    if submitted and new_value:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute(f'UPDATE Classes SET {field} = ? WHERE Class_ID = ?', (new_value, class_id))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"✅ Class {field} updated!")
                                 st.rerun()
                             else:
-                                st.error(message)
-                        else:
-                            st.error("Please fill in all fields!")
+                                st.error("Class not found!")
+                        except sqlite3.IntegrityError:
+                            st.error("Error: Class name must be unique!")
+                        finally:
+                            conn.close()
             else:
-                st.info("No classes in the database.")
+                st.info("No classes in database.")
         
-        # Update Booking Status
-        with tab3:
-            st.subheader("Update Booking Status")
+        # Update Booking
+        with tab5:
+            st.subheader("Update Booking")
             bookings_df = get_bookings()
             
             if not bookings_df.empty:
                 st.dataframe(bookings_df, use_container_width=True)
                 
                 with st.form("update_booking_form"):
-                    booking_id = st.number_input("Booking ID to Update*", min_value=1, step=1)
-                    new_status = st.selectbox("New Attendance Status*", 
-                                            ["Booked", "Attended", "Cancelled", "No-Show"])
+                    st.markdown("**Step 1: Select Booking**")
+                    booking_id = st.number_input("Booking ID*", min_value=1, step=1)
                     
-                    submitted = st.form_submit_button("Update Status")
+                    st.markdown("**Step 2: Choose Field to Update**")
+                    field = st.selectbox("Field*", ['Attendance_Status'])
+                    
+                    st.markdown("**Step 3: Enter New Value**")
+                    new_value = st.selectbox("New Status*", ["Booked", "Attended", "Cancelled", "No-Show"])
+                    
+                    submitted = st.form_submit_button("✅ Update Booking", type="primary")
                     if submitted:
-                        success, message = update_booking_status(booking_id, new_status)
-                        if success:
-                            st.success(message)
-                            st.rerun()
-                        else:
-                            st.error(message)
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute(f'UPDATE Class_Bookings SET {field} = ? WHERE Booking_ID = ?', (new_value, booking_id))
+                            conn.commit()
+                            if cursor.rowcount > 0:
+                                st.success(f"✅ Booking updated!")
+                                st.rerun()
+                            else:
+                                st.error("Booking not found!")
+                        finally:
+                            conn.close()
             else:
-                st.info("No bookings in the database.")
+                st.info("No bookings in database.")
     
-    # ========================================
     # JOIN QUERIES
-    # ========================================
-    elif menu == "🔍 JOIN Queries":
+    elif menu == "🔍 JOIN":
         st.header("JOIN Query Results")
         
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "👥 Members & Memberships", 
             "📅 Class Schedule", 
             "🎫 Member Bookings", 
-            "📊 Trainer Workload"
+            "📊 Trainer Workload",
+            "🔧 Custom JOIN"
         ])
         
-        # Query 1: Members with Memberships
         with tab1:
             st.subheader("Members with Their Active Membership Plans")
             st.markdown("**JOIN: Members ⋈ Member_Memberships ⋈ Membership_Plans**")
@@ -910,7 +1128,6 @@ def main():
             st.dataframe(df, use_container_width=True)
             st.info(f"Total Records: {len(df)}")
         
-        # Query 2: Class Schedule
         with tab2:
             st.subheader("Complete Class Schedule with Trainer Information")
             st.markdown("**JOIN: Classes ⋈ Trainers**")
@@ -918,7 +1135,6 @@ def main():
             st.dataframe(df, use_container_width=True)
             st.info(f"Total Classes: {len(df)}")
         
-        # Query 3: Member Bookings
         with tab3:
             st.subheader("Member Class Bookings with Details")
             st.markdown("**JOIN: Class_Bookings ⋈ Members ⋈ Classes ⋈ Trainers**")
@@ -926,17 +1142,153 @@ def main():
             st.dataframe(df, use_container_width=True)
             st.info(f"Total Bookings: {len(df)}")
         
-        # Query 4: Trainer Workload
         with tab4:
             st.subheader("Trainer Workload Analysis")
             st.markdown("**JOIN: Trainers ⟕ Classes (LEFT JOIN with GROUP BY)**")
             df = get_trainer_workload_join()
             st.dataframe(df, use_container_width=True)
             st.info(f"Total Trainers: {len(df)}")
+        
+        with tab5:
+            st.subheader("🔧 Custom JOIN Builder")
+            st.info("💡 Select tables you want to join and we'll show the combined data")
+            
+            # Available tables and their relationships
+            available_tables = {
+                "Members": "Members",
+                "Membership Plans": "Membership_Plans",
+                "Member Memberships": "Member_Memberships",
+                "Trainers": "Trainers",
+                "Classes": "Classes",
+                "Class Bookings": "Class_Bookings"
+            }
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Select Tables to JOIN:**")
+                selected_tables = st.multiselect(
+                    "Choose 2 or more tables",
+                    list(available_tables.keys()),
+                    default=["Members", "Member Memberships"]
+                )
+            
+            with col2:
+                if len(selected_tables) >= 2:
+                    st.markdown("**JOIN Type:**")
+                    join_type = st.radio("Type", ["INNER JOIN", "LEFT JOIN"], horizontal=True)
+                else:
+                    st.warning("⚠️ Select at least 2 tables to join")
+            
+            if st.button("🔍 Execute JOIN Query", type="primary") and len(selected_tables) >= 2:
+                try:
+                    conn = get_connection()
+                    
+                    # Build query based on selected tables
+                    table_names = [available_tables[t] for t in selected_tables]
+                    
+                    # Smart JOIN logic based on common patterns
+                    if "Members" in table_names and "Member_Memberships" in table_names:
+                        if "Membership_Plans" in table_names:
+                            # Members + Memberships + Plans
+                            query = f'''
+                            SELECT m.*, mm.Start_Date, mm.End_Date, mm.Payment_Status, 
+                                   mp.Plan_Name, mp.Price
+                            FROM Members m
+                            {join_type} Member_Memberships mm ON m.Member_ID = mm.Member_ID
+                            {join_type} Membership_Plans mp ON mm.Plan_ID = mp.Plan_ID
+                            '''
+                        else:
+                            # Members + Memberships
+                            query = f'''
+                            SELECT m.*, mm.Start_Date, mm.End_Date, mm.Payment_Status, mm.Is_Active
+                            FROM Members m
+                            {join_type} Member_Memberships mm ON m.Member_ID = mm.Member_ID
+                            '''
+                    
+                    elif "Classes" in table_names and "Trainers" in table_names:
+                        if "Class_Bookings" in table_names:
+                            # Classes + Trainers + Bookings
+                            query = f'''
+                            SELECT c.Class_Name, c.Schedule_Day, c.Schedule_Time,
+                                   t.First_Name || ' ' || t.Last_Name AS Trainer,
+                                   cb.Booking_Date, cb.Attendance_Status
+                            FROM Classes c
+                            {join_type} Trainers t ON c.Trainer_ID = t.Trainer_ID
+                            {join_type} Class_Bookings cb ON c.Class_ID = cb.Class_ID
+                            '''
+                        else:
+                            # Classes + Trainers
+                            query = f'''
+                            SELECT c.*, t.First_Name || ' ' || t.Last_Name AS Trainer_Name,
+                                   t.Specialization
+                            FROM Classes c
+                            {join_type} Trainers t ON c.Trainer_ID = t.Trainer_ID
+                            '''
+                    
+                    elif "Members" in table_names and "Class_Bookings" in table_names:
+                        if "Classes" in table_names:
+                            # Members + Bookings + Classes
+                            query = f'''
+                            SELECT m.First_Name || ' ' || m.Last_Name AS Member,
+                                   c.Class_Name, c.Schedule_Day, c.Schedule_Time,
+                                   cb.Booking_Date, cb.Attendance_Status
+                            FROM Members m
+                            {join_type} Class_Bookings cb ON m.Member_ID = cb.Member_ID
+                            {join_type} Classes c ON cb.Class_ID = c.Class_ID
+                            '''
+                        else:
+                            # Members + Bookings
+                            query = f'''
+                            SELECT m.*, cb.Booking_Date, cb.Attendance_Status
+                            FROM Members m
+                            {join_type} Class_Bookings cb ON m.Member_ID = cb.Member_ID
+                            '''
+                    
+                    elif "Trainers" in table_names and "Classes" in table_names:
+                        # Trainers + Classes
+                        query = f'''
+                        SELECT t.First_Name || ' ' || t.Last_Name AS Trainer,
+                               t.Specialization,
+                               c.Class_Name, c.Schedule_Day, c.Schedule_Time
+                        FROM Trainers t
+                        {join_type} Classes c ON t.Trainer_ID = c.Trainer_ID
+                        '''
+                    
+                    else:
+                        # Generic JOIN for other combinations
+                        query = f"SELECT * FROM {table_names[0]}"
+                        st.info("⚠️ This combination requires manual JOIN conditions. Showing first table only.")
+                    
+                    st.markdown(f"**Executing Query:**")
+                    st.code(query, language="sql")
+                    
+                    df = pd.read_sql_query(query, conn)
+                    conn.close()
+                    
+                    st.success(f"✅ JOIN executed successfully! Found {len(df)} records")
+                    st.dataframe(df, use_container_width=True)
+                    
+                    # Show query info
+                    st.markdown("**Query Information:**")
+                    st.write(f"- Tables joined: {', '.join(selected_tables)}")
+                    st.write(f"- JOIN type: {join_type}")
+                    st.write(f"- Total rows: {len(df)}")
+                    st.write(f"- Total columns: {len(df.columns)}")
+                    
+                except Exception as e:
+                    st.error(f"Error executing JOIN: {str(e)}")
+                    st.info("💡 Tip: Make sure selected tables have relationship columns (foreign keys)")
+            
+            # Show helpful information
+            st.markdown("---")
+            st.markdown("**💡 Common JOIN Patterns:**")
+            st.write("• **Members + Member Memberships + Plans**: See members with their subscription details")
+            st.write("• **Classes + Trainers**: See which trainer teaches which class")
+            st.write("• **Members + Class Bookings + Classes**: See member booking history")
+            st.write("• **Trainers + Classes + Bookings**: See trainer schedule with bookings")
     
-    # ========================================
     # VIEW TABLES
-    # ========================================
     elif menu == "📊 View Tables":
         st.header("View All Tables")
         
@@ -985,9 +1337,8 @@ def main():
             st.dataframe(df, use_container_width=True)
             st.info(f"Total Bookings: {len(df)}")
     
-    # Footer
     st.markdown("---")
-    st.markdown("**CMPE 351 - Database Systems Project** | Fitness & Gym Membership Management System")
+    st.markdown("**CMPE 351 - Database Systems Project** | Nehir Gürsoy 122200051")
 
 if __name__ == "__main__":
     main()
